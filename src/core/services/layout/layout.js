@@ -141,8 +141,22 @@
 
     // Attribute directives with no value(s) and NO breakpoints
 
-    .directive('layoutMargin', attributeWithoutValue('layout-margin'))
     .directive('layoutPadding', attributeWithoutValue('layout-padding'))
+    .directive('layoutPaddingSm', attributeWithoutValue('layout-padding-sm'))
+    .directive('layoutPaddingGtSm', attributeWithoutValue('layout-padding-gt-sm'))
+    .directive('layoutPaddingMd', attributeWithoutValue('layout-padding-md'))
+    .directive('layoutPaddingGtMd', attributeWithoutValue('layout-padding-gt-md'))
+    .directive('layoutPaddingLg', attributeWithoutValue('layout-padding-lg'))
+    .directive('layoutPaddingGtLg', attributeWithoutValue('layout-padding-gt-lg'))
+    
+    .directive('layoutMargin', attributeWithoutValue('layout-margin'))
+    .directive('layoutMarginSm', attributeWithoutValue('layout-margin-sm'))
+    .directive('layoutMarginGtSm', attributeWithoutValue('layout-margin-gt-sm'))
+    .directive('layoutMarginMd', attributeWithoutValue('layout-margin-md'))
+    .directive('layoutMarginGtMd', attributeWithoutValue('layout-margin-gt-md'))
+    .directive('layoutMarginLg', attributeWithoutValue('layout-margin-lg'))
+    .directive('layoutMarginGtLg', attributeWithoutValue('layout-margin-gt-lg'))
+
     .directive('layoutWrap', attributeWithoutValue('layout-wrap'))
     .directive('layoutNoWrap', attributeWithoutValue('layout-no-wrap'))
     .directive('layoutFill', attributeWithoutValue('layout-fill'))
@@ -250,7 +264,10 @@
       updateFn(getNormalizedAttrValue(className, attrs, ""));
       scope.$on("$destroy", function() { unwatch() });
 
-      if (config.removeAttributes) element.removeAttr(className);
+
+      if (config.removeAttributes && (element[0].nodeName != "#comment")) {
+        element.removeAttr(className);
+      }
     }
   }
 
@@ -322,9 +339,7 @@
     return function updateClassFn(newValue) {
       var value = validateAttributeValue(className, newValue || "");
       if ( angular.isDefined(value) ) {
-        if (lastClass) { 
-          element.removeClass(lastClass);
-        }
+        if (lastClass) element.removeClass(lastClass);
         lastClass = !value ? className : className + "-" + value.replace(WHITESPACE, "-");
         element.addClass(lastClass);
       }

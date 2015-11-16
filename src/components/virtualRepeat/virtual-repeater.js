@@ -78,7 +78,8 @@ var MAX_ELEMENT_SIZE = 1533917;
 var NUM_EXTRA = 3;
 
 /** @ngInject */
-function VirtualRepeatContainerController($$rAF, $parse, $scope, $element, $attrs) {
+function VirtualRepeatContainerController(
+    $$rAF, $mdUtil, $parse, $window, $scope, $element, $attrs) {
   this.$scope = $scope;
   this.$element = $element;
   this.$attrs = $attrs;
@@ -126,17 +127,23 @@ function VirtualRepeatContainerController($$rAF, $parse, $scope, $element, $attr
   this.sizer = this.scroller.getElementsByClassName('md-virtual-repeat-sizer')[0];
   this.offsetter = this.scroller.getElementsByClassName('md-virtual-repeat-offsetter')[0];
 
-  $$rAF(angular.bind(this, this.updateSize));
+  // After the dom stablizes, measure the initial size of the container and
+  // make a best effort at re-measuring as it changes.
+  var boundUpdateSize = angular.bind(this, this.updateSize);
 
-  // TODO: Come up with a more robust (But hopefully also quick!) way of
-  // detecting that we're not visible.
-  if ($attrs.ngHide) {
-    $scope.$watch($attrs.ngHide, angular.bind(this, function(hidden) {
-      if (!hidden) {
-        $$rAF(angular.bind(this, this.updateSize));
-      }
-    }));
-  }
+  $$rAF(function() {
+    boundUpdateSize();
+
+    var debouncedUpdateSize = $mdUtil.debounce(boundUpdateSize, 10, null, false);
+    var jWindow = angular.element($window);
+
+    jWindow.on('resize', debouncedUpdateSize);
+    $scope.$on('$destroy', function() {
+      jWindow.off('resize', debouncedUpdateSize);
+    });
+
+    $scope.$on('$md-resize', boundUpdateSize);
+  });
 }
 
 
@@ -422,6 +429,12 @@ function VirtualRepeatController($scope, $element, $attrs, $browser, $document, 
   /** @type {boolean} Whether this is the first time that items are rendered. */
   this.isFirstRender = true;
 
+  /**
+   * @private {boolean} Whether the items in the list are already being updated. Used to prevent
+   *     nested calls to virtualRepeatUpdate_.
+   */
+  this.isVirtualRepeatUpdating_ = false;
+
   /** @type {number} Most recently seen length of items. */
   this.itemsLength = 0;
 
@@ -543,7 +556,11 @@ VirtualRepeatController.prototype.containerUpdated = function() {
     this.unwatchItemSize_();
     this.sized = true;
     this.$scope.$watchCollection(this.repeatListExpression,
-        angular.bind(this, this.virtualRepeatUpdate_));
+        angular.bind(this, function(items, oldItems) {
+          if (!this.isVirtualRepeatUpdating_) {
+            this.virtualRepeatUpdate_(items, oldItems);
+          }
+        }));
   }
 
   this.updateIndexes_();
@@ -574,6 +591,8 @@ VirtualRepeatController.prototype.getItemSize = function() {
  * @private
  */
 VirtualRepeatController.prototype.virtualRepeatUpdate_ = function(items, oldItems) {
+  this.isVirtualRepeatUpdating_ = true;
+
   var itemsLength = items && items.length || 0;
   var lengthChanged = false;
 
@@ -664,6 +683,8 @@ VirtualRepeatController.prototype.virtualRepeatUpdate_ = function(items, oldItem
 
   this.startIndex = this.newStartIndex;
   this.endIndex = this.newEndIndex;
+
+  this.isVirtualRepeatUpdating_ = false;
 };
 
 

@@ -1,7 +1,7 @@
 describe('$mdDialog', function() {
   var runAnimation;
 
-  beforeEach(module('material.components.dialog'));
+  beforeEach(module('material.components.dialog', 'ngSanitize'));
   beforeEach(inject(function spyOnMdEffects($$q, $animate) {
 
     spyOn($animate, 'leave').and.callFake(function(element) {
@@ -13,6 +13,7 @@ describe('$mdDialog', function() {
       return $$q.when();
     });
   }));
+
   beforeEach(inject(function($material) {
     runAnimation = function() {
       $material.flushInterimElement();
@@ -21,7 +22,7 @@ describe('$mdDialog', function() {
 
   describe('#alert()', function() {
     hasConfigurationMethods('alert', [
-      'title', 'content', 'ariaLabel',
+      'title', 'htmlContent', 'textContent', 'ariaLabel',
       'ok', 'targetEvent', 'theme'
     ]);
 
@@ -48,12 +49,12 @@ describe('$mdDialog', function() {
           var mdDialog = mdContainer.find('md-dialog');
           var mdContent = mdDialog.find('md-dialog-content');
           var title = mdContent.find('h2');
-          var content = mdContent.find('p');
+          var contentBody = mdContent[0].querySelector('.md-dialog-content-body');
           var buttons = parent.find('md-button');
           var css = mdDialog.attr('class').split(' ');
 
           expect(title.text()).toBe('');
-          expect(content.text()).toBe('');
+          expect(contentBody.textContent).toBe('');
           expect(css).toContain('someClass');
           expect(css).toContain('anotherClass');
 
@@ -65,7 +66,7 @@ describe('$mdDialog', function() {
           expect(resolved).toBe(true);
         }));
 
-    it('shows a basic alert dialog', inject(function($animate, $rootScope, $mdDialog, $mdConstant) {
+    it('shows a basic alert dialog', inject(function($animate, $rootScope, $mdDialog) {
       var parent = angular.element('<div>');
       var resolved = false;
 
@@ -74,7 +75,7 @@ describe('$mdDialog', function() {
           .alert()
           .parent(parent)
           .title('Title')
-          .content('Hello world')
+          .textContent('Hello world')
           .theme('some-theme')
           .css('someClass anotherClass')
           .ok('Next')
@@ -89,13 +90,13 @@ describe('$mdDialog', function() {
       var mdDialog = mdContainer.find('md-dialog');
       var mdContent = mdDialog.find('md-dialog-content');
       var title = mdContent.find('h2');
-      var content = mdContent.find('p');
+      var contentBody = mdContent[0].querySelector('.md-dialog-content-body');
       var buttons = parent.find('md-button');
       var theme = mdDialog.attr('md-theme');
       var css = mdDialog.attr('class').split(' ');
 
       expect(title.text()).toBe('Title');
-      expect(content.text()).toBe('Hello world');
+      expect(contentBody.textContent).toBe('Hello world');
       expect(buttons.length).toBe(1);
       expect(buttons.eq(0).text()).toBe('Next');
       expect(theme).toBe('some-theme');
@@ -193,11 +194,11 @@ describe('$mdDialog', function() {
 
   describe('#confirm()', function() {
     hasConfigurationMethods('confirm', [
-      'title', 'content', 'ariaLabel',
+      'title', 'htmlContent', 'textContent', 'ariaLabel',
       'ok', 'cancel', 'targetEvent', 'theme'
     ]);
 
-    it('shows a basic confirm dialog with simple text content', inject(function($rootScope, $mdDialog, $animate, $timeout) {
+    it('shows a basic confirm dialog with simple text content', inject(function($rootScope, $mdDialog) {
       var parent = angular.element('<div>');
       var rejected = false;
       $mdDialog.show(
@@ -205,7 +206,7 @@ describe('$mdDialog', function() {
           parent: parent
         })
           .title('Title')
-          .content('Hello world')
+          .textContent('Hello world')
           .ok('Next')
           .cancel('Forget it')
       ).catch(function() {
@@ -217,12 +218,12 @@ describe('$mdDialog', function() {
       var container = angular.element(parent[0].querySelector('.md-dialog-container'));
       var dialog = parent.find('md-dialog');
       var title = parent.find('h2');
-      var content = parent.find('p');
+      var contentBody = parent[0].querySelector('.md-dialog-content-body');
       var buttons = parent.find('md-button');
 
       expect(dialog.attr('role')).toBe('dialog');
       expect(title.text()).toBe('Title');
-      expect(content.text()).toBe('Hello world');
+      expect(contentBody.textContent).toBe('Hello world');
       expect(buttons.length).toBe(2);
       expect(buttons.eq(0).text()).toBe('Next');
       expect(buttons.eq(1).text()).toBe('Forget it');
@@ -234,7 +235,7 @@ describe('$mdDialog', function() {
       expect(rejected).toBe(true);
     }));
 
-    it('shows a basic confirm dialog with HTML content', inject(function($rootScope, $mdDialog, $animate) {
+    it('should allow htmlContent with simple HTML tags', inject(function($mdDialog) {
       var parent = angular.element('<div>');
 
       $mdDialog.show(
@@ -243,7 +244,7 @@ describe('$mdDialog', function() {
           ok: 'Next',
           cancel: 'Back',
           title: 'Which Way ',
-          content: '<div class="mine">Choose</div>'
+          htmlContent: '<div class="mine">Choose</div>'
         })
       );
 
@@ -255,7 +256,7 @@ describe('$mdDialog', function() {
       expect(content.text()).toBe('Choose');
     }));
 
-    it('shows a basic confirm dialog with HTML content using custom types', inject(function($rootScope, $mdDialog, $animate) {
+    it('should NOT allow custom elements in confirm htmlContent', inject(function($mdDialog) {
       var parent = angular.element('<div>');
 
       $mdDialog.show(
@@ -264,16 +265,37 @@ describe('$mdDialog', function() {
           ok: 'Next',
           cancel: 'Back',
           title: 'Which Way ',
-          content: '<my-content class="mine">Choose</my-content>'
+          htmlContent: '<my-content class="mine">Choose</my-content> breakfast'
         })
       );
 
       runAnimation();
 
       var container = angular.element(parent[0].querySelector('.md-dialog-container'));
-      var content = angular.element(container[0].querySelector('.mine'));
+      var contentBody = container[0].querySelector('.md-dialog-content-body');
 
-      expect(content.text()).toBe('Choose');
+      expect(contentBody.textContent).toBe('Choose breakfast');
+    }));
+
+    it('should NOT evaluate angular templates in confirm htmlContent', inject(function($mdDialog) {
+      var parent = angular.element('<div>');
+
+      $mdDialog.show(
+        $mdDialog.confirm({
+          parent: parent,
+          ok: 'Next',
+          cancel: 'Back',
+          title: 'Which Way ',
+          htmlContent: '{{1 + 1}}'
+        })
+      );
+
+      runAnimation();
+
+      var container = angular.element(parent[0].querySelector('.md-dialog-container'));
+      var contentBody = container[0].querySelector('.md-dialog-content-body');
+
+      expect(contentBody.textContent).toBe('{{1 + 1}}');
     }));
 
     it('should focus `md-button.dialog-close` on open', inject(function($mdDialog, $rootScope, $document, $timeout, $mdConstant) {
@@ -282,11 +304,11 @@ describe('$mdDialog', function() {
       var parent = angular.element('<div>');
       $mdDialog.show({
         template: '' +
-        '<md-dialog>' +
-        '  <div class="md-actions">' +
-        '    <button class="dialog-close">Close</button>' +
-        '  </div>' +
-        '</md-dialog>',
+          '<md-dialog>' +
+          '  <md-dialog-actions>' +
+          '    <button class="dialog-close">Close</button>' +
+          '  </md-dialog-actions>' +
+          '</md-dialog>',
         parent: parent
       });
       runAnimation();
@@ -459,7 +481,6 @@ describe('$mdDialog', function() {
       function onShowing(scope, element, options) {
         showing = true;
         container = angular.element(parent[0].querySelector('.md-dialog-container'));
-        expect(arguments.length).toEqual(3);
         expect(container.length).toBe(0);
       }
 
@@ -476,7 +497,6 @@ describe('$mdDialog', function() {
         template: template,
         parent: parent,
         onComplete: function(scope, element, options) {
-          expect(arguments.length).toEqual(3);
           ready = true;
         }
       });
@@ -756,12 +776,13 @@ describe('$mdDialog', function() {
       $mdDialog.show({
         focusOnOpen: true,
         parent: parent,
-        template: '<md-dialog>' +
-        '<div class="md-actions">' +
-        '<button id="a">A</md-button>' +
-        '<button id="focus-target">B</md-button>' +
-        '</div>' +
-        '</md-dialog>'
+        template:
+          '<md-dialog>' +
+          '  <md-dialog-actions>' +
+          '    <button id="a">A</md-button>' +
+          '    <button id="focus-target">B</md-button>' +
+          '  </md-dialog-actions>' +
+          '</md-dialog>'
       });
 
       $rootScope.$apply();
@@ -777,12 +798,13 @@ describe('$mdDialog', function() {
       $mdDialog.show({
         focusOnOpen: false,
         parent: parent,
-        template: '<md-dialog>' +
-        '<div class="md-actions">' +
-        '<button id="a">A</md-button>' +
-        '<button id="focus-target">B</md-button>' +
-        '</div>' +
-        '</md-dialog>',
+        template:
+          '<md-dialog>' +
+            '<md-dialog-actions>' +
+              '<button id="a">A</md-button>' +
+              '<button id="focus-target">B</md-button>' +
+            '</md-dialog-actions>' +
+          '</md-dialog>',
       });
 
       $rootScope.$apply();
@@ -930,23 +952,88 @@ describe('$mdDialog', function() {
         'translate3d(240px, 120px, 0px) scale(0.5, 0.5)');
     }));
 
-    it('should focus the last `md-button` in md-actions open if no `.dialog-close`', inject(function($mdDialog, $rootScope, $document, $timeout, $mdConstant) {
+    it('should focus the last `md-button` in md-dialog-actions open if no `.dialog-close`', inject(function($mdDialog, $rootScope, $document, $timeout, $mdConstant) {
       jasmine.mockElementFocus(this);
 
       var parent = angular.element('<div>');
       $mdDialog.show({
-        template: '<md-dialog>' +
-        '<div class="md-actions">' +
-        '<button id="a">A</md-button>' +
-        '<button id="focus-target">B</md-button>' +
-        '</div>' +
-        '</md-dialog>',
+        template:
+          '<md-dialog>' +
+          '  <md-dialog-actions>' +
+          '    <button id="a">A</md-button>' +
+          '    <button id="focus-target">B</md-button>' +
+          '  </md-dialog-actions>' +
+          '</md-dialog>',
         parent: parent
       });
 
       runAnimation();
 
       expect($document.activeElement).toBe(parent[0].querySelector('#focus-target'));
+    }));
+
+    it('should warn if the deprecated .md-actions class is used', inject(function($mdDialog, $rootScope, $log, $timeout) {
+       spyOn($log, 'warn');
+
+      var parent = angular.element('<div>');
+      $mdDialog.show({
+        template:
+          '<md-dialog>' +
+            '<div class="md-actions">' +
+              '<button class="md-button">Ok good</button>' +
+            '</div>' +
+          '</md-dialog>',
+        parent: parent
+      });
+
+      runAnimation();
+
+      expect($log.warn).toHaveBeenCalled();
+    }));
+
+    it('should warn if focusOnOpen == true and md-dialog-actions does not contain actions',
+        inject(function($mdDialog, $rootScope, $log, $timeout) {
+      spyOn($log, 'warn');
+
+      var parent = angular.element('<div>');
+      $mdDialog.show({
+        focusOnOpen: true,
+        template:
+          '<md-dialog>' +
+            '<md-dialog-actions>' +
+              '<p>Why is this here</p>' +
+            '</md-dialog-actions>' +
+          '</md-dialog>',
+        parent: parent
+      });
+
+      runAnimation();
+
+      expect($log.warn).toHaveBeenCalled();
+    }));
+
+    // This also covers the case of NOT warning when the deprecated .md-actions class is NOT used
+    it('should not warn if focusOnOpen == true and md-dialog-actions has actions',
+        inject(function($mdDialog, $rootScope, $log, $timeout) {
+      spyOn($log, 'warn');
+
+      // Style the parent so <md-backdrop> doesn't fire a warning in Firefox
+      var parent = angular.element('<div style="position: absolute; left:0;right:0;top:0;bottom:0">');
+
+      $mdDialog.show({
+        focusOnOpen: true,
+        template:
+          '<md-dialog>' +
+            '<md-dialog-actions>' +
+              '<button class="md-button">Ok good</button>' +
+            '</md-dialog-actions>' +
+          '</md-dialog>',
+        parent: parent
+      });
+
+      runAnimation();
+
+      expect($log.warn).not.toHaveBeenCalled();
     }));
 
     it('should only allow one open at a time', inject(function($mdDialog, $rootScope, $animate) {
@@ -968,6 +1055,65 @@ describe('$mdDialog', function() {
 
       expect(parent[0].querySelectorAll('md-dialog.one').length).toBe(0);
       expect(parent[0].querySelectorAll('md-dialog.two').length).toBe(1);
+    }));
+
+    it('should hide dialog', inject(function($mdDialog, $rootScope, $animate) {
+      var parent = angular.element('<div>');
+      $mdDialog.show({
+        template: '<md-dialog class="one">',
+        parent: parent
+      });
+      runAnimation();
+
+      $mdDialog.hide();
+      runAnimation();
+
+      expect(parent[0].querySelectorAll('md-dialog.one').length).toBe(0);
+    }));
+
+    it('should allow opening new dialog after existing without corruption', inject(function($mdDialog, $rootScope, $animate) {
+      var parent = angular.element('<div>');
+      $mdDialog.show({
+        template: '<md-dialog class="one">',
+        parent: parent
+      });
+      runAnimation();
+      $mdDialog.hide();
+      runAnimation();
+
+      $mdDialog.show({
+        template: '<md-dialog class="two">',
+        parent: parent
+      });
+      runAnimation();
+      $mdDialog.hide();
+      runAnimation();
+
+      expect(parent[0].querySelectorAll('md-dialog.one').length).toBe(0);
+      expect(parent[0].querySelectorAll('md-dialog.two').length).toBe(0);
+    }));
+
+    it('should allow opening new dialog from existing without corruption', inject(function($mdDialog, $rootScope, $animate) {
+      var parent = angular.element('<div>');
+      $mdDialog.show({
+        template: '<md-dialog class="one">',
+        parent: parent
+      });
+      runAnimation();
+
+      $mdDialog.show({
+        template: '<md-dialog class="two">',
+        parent: parent
+      });
+      //First run is for the old dialog being hidden.
+      runAnimation();
+      //Second run is for the new dialog being shown.
+      runAnimation();
+      $mdDialog.hide();
+      runAnimation();
+
+      expect(parent[0].querySelectorAll('md-dialog.one').length).toBe(0);
+      expect(parent[0].querySelectorAll('md-dialog.two').length).toBe(0);
     }));
 
     it('should have the dialog role', inject(function($mdDialog, $rootScope) {
@@ -1093,7 +1239,7 @@ describe('$mdDialog with custom interpolation symbols', function() {
       alert({parent: parent}).
       ariaLabel('test alert').
       title('Title').
-      content('Hello, world !').
+      textContent('Hello, world !').
       ok('OK');
 
     $mdDialog.show(dialog);
@@ -1103,13 +1249,13 @@ describe('$mdDialog with custom interpolation symbols', function() {
     var mdDialog = mdContainer.find('md-dialog');
     var mdContent = mdDialog.find('md-dialog-content');
     var title = mdContent.find('h2');
-    var content = mdContent.find('p');
-    var mdActions = angular.element(mdDialog[0].querySelector('.md-actions'));
+    var contentBody = mdContent[0].querySelector('.md-dialog-content-body');
+    var mdActions = angular.element(mdDialog[0].querySelector('md-dialog-actions'));
     var buttons = mdActions.find('md-button');
 
     expect(mdDialog.attr('aria-label')).toBe('test alert');
     expect(title.text()).toBe('Title');
-    expect(content.text()).toBe('Hello, world !');
+    expect(contentBody.textContent).toBe('Hello, world !');
     expect(buttons.eq(0).text()).toBe('OK');
   }));
 
@@ -1119,7 +1265,7 @@ describe('$mdDialog with custom interpolation symbols', function() {
       confirm({parent: parent}).
       ariaLabel('test alert').
       title('Title').
-      content('Hello, world !').
+      textContent('Hello, world !').
       cancel('CANCEL').
       ok('OK');
 
@@ -1130,15 +1276,39 @@ describe('$mdDialog with custom interpolation symbols', function() {
     var mdDialog = mdContainer.find('md-dialog');
     var mdContent = mdDialog.find('md-dialog-content');
     var title = mdContent.find('h2');
-    var content = mdContent.find('p');
-    var mdActions = angular.element(mdDialog[0].querySelector('.md-actions'));
+    var contentBody = mdContent[0].querySelector('.md-dialog-content-body');
+    var mdActions = angular.element(mdDialog[0].querySelector('md-dialog-actions'));
     var buttons = mdActions.find('md-button');
 
     expect(mdDialog.attr('aria-label')).toBe('test alert');
     expect(title.text()).toBe('Title');
-    expect(content.text()).toBe('Hello, world !');
+    expect(contentBody.textContent).toBe('Hello, world !');
     expect(buttons.eq(0).text()).toBe('CANCEL');
     expect(buttons.eq(1).text()).toBe('OK');
   }));
 });
 
+describe('$mdDialog without ngSanitize loaded', function() {
+  var $mdDialog, $rootScope;
+
+  beforeEach(module('material.components.dialog'));
+
+  beforeEach(inject(function($injector) {
+    $mdDialog = $injector.get('$mdDialog');
+    $rootScope = $injector.get('$rootScope');
+  }));
+
+  it('should throw an error when trying to use htmlContent', function() {
+    var parent = angular.element('<div>');
+    var dialog = $mdDialog.
+      alert({parent: parent}).
+      title('Title').
+      htmlContent('Hello, world !').
+      ok('OK');
+
+    expect(function() {
+      $mdDialog.show(dialog);
+      $rootScope.$digest();
+    }).toThrowError(/ngSanitize/);
+  });
+});
